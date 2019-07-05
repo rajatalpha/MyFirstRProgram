@@ -1,0 +1,42 @@
+# load and show an image with Pillow
+from PIL import Image
+# load the image
+image = array(Image.open('opera_house.jpg'))
+# summarize some details about the image
+# show the image
+imshow(image)
+
+
+def rgb2gray(img):
+         a=np.dot(img[...,:3], [0.299, 0.587, 0.114])
+         return imshow(a)
+rgb2gray(image)
+
+
+def abc(img):
+    r, g, b = img[:,:,0], img[:,:,1], img[:,:,2]
+    gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
+    return type(gray)
+
+abc(image)
+
+
+import numpy as np
+from scipy.ndimage.interpolation import rotate
+rotated = rotate(image, angle=35)
+print(type(rotated))
+imshow(rotated)
+
+
+def vertical(img):
+    img2 = np.flipud(img)
+    return plt.imshow(img2)
+
+vertical(image)
+## Function name: horizontal_flip
+## parameters : img: np.array
+## return-type: img: np.array
+
+### Define your function here (will be evaluated)
+def horizontal_flip(img):
+    return plt.imshow(np.fliplr(img))
