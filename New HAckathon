@@ -1,0 +1,35 @@
+library(shiny)
+library(shinydashboard)
+UI<-
+  dashboardPage(
+    dashboardHeader(title="Data Exploration"),
+    dashboardSidebar(
+      fileInput("file","Upload CSV files",multiple=TRUE,accept=("text/comma")),
+      sidebarMenu(id="tabs",
+                  menuItem(" FULL Data",tabName="Data",icon=icon("table"),startExpanded = TRUE),
+                  menuItem("Continous variables",tabName="Continous Variables",icon = icon("th")),
+                  menuItem("Categorical variables",tabName="Categorical Variables",icon = icon("th"))
+      )
+    ),
+    dashboardBody(
+      tabItems(
+        tabItem(tabName="Data",tableOutput("data.frame")),
+        tabItem(tabName="Continous Variables"),
+        tabItem(tabName= "Categorical Variables")
+      )
+    )
+  )
+)
+
+server<-shinyServer(function(input,output){
+  values <- reactiveValues(df_data = NULL)
+  
+  observeEvent(input$file, {
+    values$df_data <- read.csv(input$file$datapath)
+  })
+  output$data.frame <- renderTable(values$df_data)
+})
+
+shinyApp(UI, server)
+https://community.rstudio.com/t/shinydashboard-rshiny/11820/8
+https://rstudio.github.io/shinydashboard/structure.html#dynamic-content-1
