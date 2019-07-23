@@ -33,3 +33,19 @@ server<-shinyServer(function(input,output){
 shinyApp(UI, server)
 https://community.rstudio.com/t/shinydashboard-rshiny/11820/8
 https://rstudio.github.io/shinydashboard/structure.html#dynamic-content-1
+
+##tuesday morning##
+```{r}
+htrain<-read.csv('housing_train.csv')
+str(htrain)
+```
+
+```{r}
+continous<-htrain[ ,!sapply(htrain, is.factor)]
+str(continous)
+```
+
+```{r}
+categorical<-htrain[,sapply(htrain, is.factor)]
+str(categorical)
+```
