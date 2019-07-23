@@ -1,0 +1,84 @@
+```{r}
+library(shiny)
+library(shinydashboard)
+library(DT)
+UI<-
+  dashboardPage(
+    dashboardHeader(title="Data Exploration"),
+    dashboardSidebar(
+      fileInput("file","Upload CSV files",multiple=TRUE,accept=("text/comma")),
+      sidebarMenu(id="tabs",
+                  menuItem(" FULL Data",tabName="Data",icon=icon("table"),startExpanded = TRUE),
+                  menuItem("Continous variables",tabName="Continous Variables",icon = icon("th")),
+                  menuItem("Categorical variables",tabName="Categorical Variables",icon = icon("th"))
+      )
+    ),
+    dashboardBody(
+      tabItems(
+        tabItem(tabName="Data",DT::dataTableOutput("data.frame")),
+        tabItem(tabName=" Exploring Continous Variables"
+                fluidRow(
+                  box(
+                    title = "Summary Statistics Of Continouus variables", width = 6, status = "primary",
+                    "Summmary Statistics"
+                  )),
+                fluidRow(
+                  box(
+                    title = "Number of Missing Values in that variable", width = 6, status = "primary",
+                    textOutput("Numcount")
+                  )),
+                fluidRow(
+                  column(width = 6,
+                         box(
+                           title = "Title 1", width = NULL, solidHeader = TRUE, status = "primary",
+                           "Box plot of selected Variable"
+                         )),
+                  column(width = 6,
+                         box(
+                           width = NULL, background = "white",
+                           "histogram of Selected variable"
+                            )
+                         )
+                )
+                ),
+        tabItem(tabName= "Exploring Categorical Variables"
+                fluidRow(
+                  box(
+                    title = "Frequency Table of selected Variable ", width = 6, status = "primary",
+                    "Frequency table of that selected categorical varibale"
+                  )),
+                fluidRow(
+                  box(
+                    title = "Number of Missing Values in that variable", width = 6, status = "primary",
+                    textOutput("Numcount")
+                  )),
+                fluidRow(
+                  column(width = 6,
+                         box(
+                           title = "Title 1", width = NULL, solidHeader = TRUE, status = "primary",
+                           "Count plot of selected Variable"
+                         )),
+                  )
+                )
+                )
+      )
+    )
+  )
+)
+
+server<-shinyServer(function(input,output){
+  # read file
+  values <- reactiveValues(df_data = NULL)
+  
+  observeEvent(input$file, {
+    values$df_data <- read.csv(input$file$datapath)
+  })
+  observeEvent(input$file, {
+    
+    # render tables at file upload
+    output$data.frame <-DT::renderDataTable(
+      DT::datatable(values())
+  }
+
+shinyApp(UI, server)
+```
