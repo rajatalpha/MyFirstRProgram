@@ -2,56 +2,88 @@ library(shiny)
 library(shinydashboard)
 library(DT)
 
-UI<-
-  dashboardPage(
-    dashboardHeader(title="Data Exploration"),
-    
-    dashboardSidebar(
-      fileInput("file","Upload CSV files",multiple=TRUE,accept=("text/comma")),
-      sidebarMenu(
-                  menuItem(" FULL Data",tabName="Data",icon=icon("table"),startExpanded = TRUE),
-                  menuItem("Continous variables",tabName="Continous Variables",icon = icon("th")),
-                  menuItem("Categorical variables",tabName="Categorical Variables",icon = icon("th"))
-      )
-    ),
-    
-    dashboardBody(
-      tabItems(
-        tabItem(tabName="Data",
-                fluidRow(
-                  h2("A look into the Whole Dataset")
-                ),  # end of 1st Fluid Row        
-                      
-                fluidRow(
-                  DT::dataTableOutput("data.frame"))# end of 2nd Fluidrow 
-                ),   #end of 1st tab item
-      tabItem(tabName = "Continous Variables",
+
+convertMenuItem <- function(mi,tabName) {
+  mi$children[[1]]$attribs['data-toggle']="tab"
+  mi$children[[1]]$attribs['data-value'] = "tabName"
+  mi
+}
+
+
+UI <-dashboardPage(
+  dashboardHeader(title="Data Exploration"),
+  dashboardSidebar(
+    sidebarMenu(
+      convertMenuItem(menuItem("Full data",tabName="Data",icon=icon("table"),startExpanded = TRUE,
+                               fileInput("file","Upload CSV files",multiple=TRUE,accept=("text/comma")),
+                               selectInput("select", "Select Variable","None", "placeholder 1",multiple = TRUE),
+                               actionButton(inputId = "Go",label = "Go")
+      ), tabName = "Data"),
+      convertMenuItem(menuItem("Continous variables",tabName="Continous Variables",icon=icon("table"),
+                               selectInput(inputId = "Contvariable",
+                                           label = "Select Variable",
+                                           choices="",selected=""
+                               ),
+                               # button
+                               actionButton(inputId = "GoCON",label = "Go")
+      ), tabName = "Continous variables"),
+      convertMenuItem(menuItem("Categorical variables",tabName="Categorical variables",icon=icon("table"),
+                               selectInput(inputId = "Catvariable",
+                                           label = "Select Variable",
+                                           choices="",selected=""
+                               ),
+                               actionButton(inputId = "GoCAT",label = "Go")
+      ), tabName = "Categorical variables")
+    )
+  ),
+  dashboardBody(
+    tabItems(
+      tabItem(tabName="Data",class = "active",
               fluidRow(
-                box(h2("AALA RE"))  
-              ),   # end of 1st Fluid Row
+                h2("A look into the Whole Dataset")
+              ),  # end of 1st Fluid Row        
+              
               fluidRow(
-                box(h2("BOla"))
-              )   # end of 2nd Fluidrow  
+                DT::dataTableOutput("data.frame")),#end of 2nd Fluidrow
+              fluidRow(
+                h2("Subsetted DataFrame")
+              ),  #end of 3 fluidrow
+              fluidRow(
+                DT::dataTableOutput("data.frame2"))#  
+            ),   #end of 1st tab item
+      tabItem(tabName = "Continous Variables",h2("New Content page 2"),
+              tabPanel("Continous variables",
+                       fluidRow(
+                         verbatimTextOutput("summary")))
+              
       ),  # end of second tab Items
-      tabItem(tabName = "Categorical Variables",
-              fluidRow(
-                box(h2("cha"))  
-              ),   # end of 1st Fluid Row
-              fluidRow(
-                box(h2("Ganesh"))
-              )  # end of 2 Fluidrow
+      tabItem(tabName = "Categorical Variables",h2("New Content page 3")
       )  # end Of last tabitem     
     )  # end of Tabitems
   )         #Dashboard Body
-  )         ###End of Dashboard page
+)         ###End of Dashboard page
 
-server<-shinyServer(function(input,output){
+server<-shinyServer(function(input,output,session){
   values <- reactiveValues(df_data = NULL)
   
   observeEvent(input$file, {
     values$df_data <- read.csv(input$file$datapath)
   })
+  ## update 'columns' selector
+  observeEvent(input$file, {
+    updateSelectInput(session, "select", choices = names(values$df_data))
+    updateSelectInput(session, "Contvariable", choices = names(values$df_data[ ,!sapply(values$df_data, is.factor)]))
+    updateSelectInput(session, "Catvariable", choices = names(values$df_data[,sapply(values$df_data, is.factor)]))
+  })
   output$data.frame <-DT::renderDataTable(values$df_data)
+  
+  observeEvent(input$Go, {
+    output$data.frame2 <- DT::renderDataTable({
+      subset_table <- values$df_data[, input$select, drop = F]
+      datatable(subset_table)
+    })
+  })
+  
 })
 shinyApp(UI, server)
 
