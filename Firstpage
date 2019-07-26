@@ -1,6 +1,8 @@
 library(shiny)
 library(shinydashboard)
 library(DT)
+library(psych)
+library(DataExplorer)
 
 
 convertMenuItem <- function(mi,tabName) {
@@ -18,7 +20,7 @@ UI <-dashboardPage(
                                fileInput("file","Upload CSV files",multiple=TRUE,accept=("text/comma")),
                                selectInput("select", "Select Variable","None", "placeholder 1",multiple = TRUE),
                                actionButton(inputId = "Go",label = "Go")
-      ), tabName = "Data"),
+      ),"Data"),
       convertMenuItem(menuItem("Continous variables",tabName="Continous Variables",icon=icon("table"),
                                selectInput(inputId = "Contvariable",
                                            label = "Select Variable",
@@ -26,40 +28,45 @@ UI <-dashboardPage(
                                ),
                                # button
                                actionButton(inputId = "GoCON",label = "Go")
-      ), tabName = "Continous variables"),
+      ),"Continous variables"),
       convertMenuItem(menuItem("Categorical variables",tabName="Categorical variables",icon=icon("table"),
                                selectInput(inputId = "Catvariable",
                                            label = "Select Variable",
                                            choices="",selected=""
                                ),
                                actionButton(inputId = "GoCAT",label = "Go")
-      ), tabName = "Categorical variables")
+      ),"Categorical variables")
     )
   ),
   dashboardBody(
-    tabItems(
-      tabItem(tabName="Data",class = "active",
+    tabsetPanel(
+      tabPanel("Data",
+         tabItem(tabName="Data",
               fluidRow(
-                h2("A look into the Whole Dataset")
-              ),  # end of 1st Fluid Row        
-              
-              fluidRow(
+                h2('A brief Look into the Datset'),
                 DT::dataTableOutput("data.frame")),#end of 2nd Fluidrow
               fluidRow(
-                h2("Subsetted DataFrame")
-              ),  #end of 3 fluidrow
+                h4("Subsetted Dataset"),
+                DT::dataTableOutput("data.frame2"),
+                h4("Structure of Dataset"),
+                verbatimTextOutput("struct"),
+                h4("Summary of dataset"),
+                verbatimTextOutput("Summary")))), #end of 1st tab panel
+      tabPanel("Continous variable",
+       tabItem(tabName = "Continous Variables",
               fluidRow(
-                DT::dataTableOutput("data.frame2"))#  
-            ),   #end of 1st tab item
-      tabItem(tabName = "Continous Variables",h2("New Content page 2"),
-              tabPanel("Continous variables",
+                h2("Welcome to Continous variable tab"),
+                mainPanel(
+                  plotOutput("histc")
+                )
+              )
+      )),  # end of second tab panel
+      tabPanel("Categorical variable",
+       tabItem(tabName = "Categorical Variables",h2("New Content page 3"),
                        fluidRow(
-                         verbatimTextOutput("summary")))
-              
-      ),  # end of second tab Items
-      tabItem(tabName = "Categorical Variables",h2("New Content page 3")
-      )  # end Of last tabitem     
-    )  # end of Tabitems
+                         verbatimTextOutput("Truetable")))
+      )  # end Of last tabpanel
+    ) # end Of tabsetpanel
   )         #Dashboard Body
 )         ###End of Dashboard page
 
@@ -68,6 +75,17 @@ server<-shinyServer(function(input,output,session){
   
   observeEvent(input$file, {
     values$df_data <- read.csv(input$file$datapath)
+    
+    output$data.frame <-DT::renderDataTable(values$df_data)
+    
+    output$struct<-renderPrint({
+      df <- values$df_data
+      str(df)
+    })
+    
+    output$Summary<-renderPrint({
+      df <- values$df_data
+      describe(df)})
   })
   ## update 'columns' selector
   observeEvent(input$file, {
@@ -75,12 +93,32 @@ server<-shinyServer(function(input,output,session){
     updateSelectInput(session, "Contvariable", choices = names(values$df_data[ ,!sapply(values$df_data, is.factor)]))
     updateSelectInput(session, "Catvariable", choices = names(values$df_data[,sapply(values$df_data, is.factor)]))
   })
-  output$data.frame <-DT::renderDataTable(values$df_data)
+  
+  
   
   observeEvent(input$Go, {
     output$data.frame2 <- DT::renderDataTable({
       subset_table <- values$df_data[, input$select, drop = F]
       datatable(subset_table)
+    })
+  })
+  observeEvent(input$GoCON, {
+    output$summary <- renderPrint({
+      df <- values$df_data
+      df <- df[,input$Contvariable]
+      describe(df) 
+    })
+    output$histc<-renderPlot({
+      df <- values$df_data
+      df <- df[,input$Contvariable]
+      boxplot(df,col="sky blue",border="purple",main=input$Contvariable)
+    })
+  })
+  observeEvent(input$GoCAT, {
+    output$Truetable <- renderPrint({
+      df <- values$df_data
+      df <- df[,input$Catvariable]
+      table(df) 
     })
   })
   
