@@ -1,70 +1,90 @@
 library(shiny)
 library(shinydashboard)
-library(DT)
-library(psych)
-library(DataExplorer)
-
-
-convertMenuItem <- function(mi,tabName) {
-  mi$children[[1]]$attribs['data-toggle']="tab"
-  mi$children[[1]]$attribs['data-value'] = "tabName"
-  mi
-}
-
+library(DT)           ##Rendering datatable
+library(psych)        ##Summary
+library(DataExplorer) ##Categorical Exploration
+library(VIM)          ##Missing Value Imputation
+library(tidyverse)    ## for %>%
+library(ggplot2)
 
 UI <-dashboardPage(
   dashboardHeader(title="Data Exploration"),
   dashboardSidebar(
     sidebarMenu(
-      convertMenuItem(menuItem("Full data",tabName="Data",icon=icon("table"),startExpanded = TRUE,
-                               fileInput("file","Upload CSV files",multiple=TRUE,accept=("text/comma")),
-                               selectInput("select", "Select Variable","None", "placeholder 1",multiple = TRUE),
-                               actionButton(inputId = "Go",label = "Go")
-      ),"Data"),
-      convertMenuItem(menuItem("Continous variables",tabName="Continous Variables",icon=icon("table"),
-                               selectInput(inputId = "Contvariable",
-                                           label = "Select Variable",
-                                           choices="",selected=""
-                               ),
-                               # button
-                               actionButton(inputId = "GoCON",label = "Go")
-      ),"Continous variables"),
-      convertMenuItem(menuItem("Categorical variables",tabName="Categorical variables",icon=icon("table"),
-                               selectInput(inputId = "Catvariable",
-                                           label = "Select Variable",
-                                           choices="",selected=""
-                               ),
-                               actionButton(inputId = "GoCAT",label = "Go")
-      ),"Categorical variables")
+      menuItem("Full data",tabName="Data",icon=icon("table"),startExpanded = TRUE,
+               fileInput("file","Upload CSV files",multiple=TRUE,accept=("text/comma")),
+               selectInput("select", "Select Variable","None", "placeholder 1",multiple = TRUE),
+               actionButton(inputId = "Go",label = "Go")
+      ),
+      menuItem("Continous variables",tabName="Continous Variables",icon=icon("table"),
+               selectInput(inputId = "Contvariable",
+                           label = "Select Variable",
+                           choices="",selected=""
+               ),
+               # button
+               actionButton(inputId = "GoCON",label = "Go")
+      ),
+      menuItem("Categorical variables",tabName="Categorical variables",icon=icon("table"),
+               selectInput(inputId = "Catvariable",
+                           label = "Select Variable",
+                           choices="",selected=""
+               ),
+               actionButton(inputId = "GoCAT",label = "Go")
+      )
     )
   ),
   dashboardBody(
     tabsetPanel(
       tabPanel("Data",
-         tabItem(tabName="Data",
-              fluidRow(
-                h2('A brief Look into the Datset'),
-                DT::dataTableOutput("data.frame")),#end of 2nd Fluidrow
-              fluidRow(
-                h4("Subsetted Dataset"),
-                DT::dataTableOutput("data.frame2"),
-                h4("Structure of Dataset"),
-                verbatimTextOutput("struct"),
-                h4("Summary of dataset"),
-                verbatimTextOutput("Summary")))), #end of 1st tab panel
-      tabPanel("Continous variable",
-       tabItem(tabName = "Continous Variables",
-              fluidRow(
-                h2("Welcome to Continous variable tab"),
-                mainPanel(
-                  plotOutput("histc")
-                )
-              )
-      )),  # end of second tab panel
-      tabPanel("Categorical variable",
-       tabItem(tabName = "Categorical Variables",h2("New Content page 3"),
+               tabItem(tabName="Data",
                        fluidRow(
-                         verbatimTextOutput("Truetable")))
+                         h2('A brief Look into the Datset'),
+                         DT::dataTableOutput("data.frame"),
+                         h2('Basic Summary'),
+                         infoBoxOutput("Ro"),
+                         infoBoxOutput("Co"),
+                         infoBoxOutput("Mi"),
+                         infoBoxOutput("No"),
+                         infoBoxOutput("DCON"),
+                         infoBoxOutput("DCAT")),
+                       fluidRow(
+                         h2('Visualizing Missing Data'),
+                         plotOutput("miss") 
+                       ),
+                       fluidRow(
+                         h4("Subsetted Dataset"),
+                         DT::dataTableOutput("data.frame2"),
+                         h4("Structure of Dataset"),
+                         verbatimTextOutput("struct"),
+                         h4("Summary of dataset"),
+                         verbatimTextOutput("Summary")))), #end of 1st tab panel
+      tabPanel("Continous variable",
+               tabItem(tabName = "Continous Variables",
+                       fluidRow(
+                         h2("Exploring Continous Variable"),
+                         infoBoxOutput("Sel"),
+                         infoBoxOutput("Nmiss"),
+                         infoBoxOutput("NonMiss")),
+                       fluidRow(
+                         box(
+                           sliderInput("slider1", "Slider input:", 0, 100, 2)
+                         ),
+                         box(
+                           sliderInput("slider2", "Slider input:", 1, 100,2)
+                         )
+                       ),
+                       fluidRow(
+                         box(plotOutput("histc")),
+                         box(plotOutput("histy"))
+                       ))
+      ),  # end of second tab panel
+      tabPanel("Categorical variable",
+               tabItem(tabName = "Categorical Variables",h2("Exploring Categorical Variable"),
+                       fluidRow(
+                         infoBoxOutput("Selc"),
+                         infoBoxOutput("Nmissc"),
+                         infoBoxOutput("NonMissc"),
+                         verbatimTextOutput("Truetable")))#end of tab item
       )  # end Of last tabpanel
     ) # end Of tabsetpanel
   )         #Dashboard Body
@@ -92,9 +112,48 @@ server<-shinyServer(function(input,output,session){
     updateSelectInput(session, "select", choices = names(values$df_data))
     updateSelectInput(session, "Contvariable", choices = names(values$df_data[ ,!sapply(values$df_data, is.factor)]))
     updateSelectInput(session, "Catvariable", choices = names(values$df_data[,sapply(values$df_data, is.factor)]))
+    output$Ro <- renderInfoBox({
+      infoBox(
+        "Row Count", paste0(nrow(values$df_data)), icon = icon("list"),
+        color = "blue",fill=TRUE
+      )
+    })
+    output$Co <- renderInfoBox({
+      infoBox(
+        "Column Count", paste0(ncol(values$df_data)), icon = icon("list"),
+        color = "orange",fill=TRUE
+      )
+    })
+    output$Mi <- renderInfoBox({
+      infoBox(
+        "Missing Values", paste0(sum(is.na(values$df_data))), icon = icon("list"),
+        color = "red",fill=TRUE
+      )
+    }) 
+    output$No <- renderInfoBox({
+      infoBox(
+        "Non missing values", paste0(unname(table(is.na(values$df_data))[1])), 
+        icon = icon("thumbs-up",lib="glyphicon"),
+        color = "olive",fill=TRUE
+      )
+    })
+    output$DCON <- renderInfoBox({
+      infoBox(
+        "Continuous Columns Count", paste0(ncol(values$df_data[ ,!sapply(values$df_data, is.factor)])), icon = icon("list"),
+        color = "maroon",fill=TRUE
+      )
+    })
+    output$DCAT <- renderInfoBox({
+      infoBox(
+        "Categorical Column Count", paste0(ncol(values$df_data[ ,sapply(values$df_data, is.factor)])), icon = icon("list"),
+        color = "purple",fill=TRUE
+      )
+    })
+    output$miss<-renderPlot({
+      df <- values$df_data
+      aggr(df, numbers = TRUE, prop = c(TRUE, FALSE))
+    }) 
   })
-  
-  
   
   observeEvent(input$Go, {
     output$data.frame2 <- DT::renderDataTable({
@@ -102,7 +161,27 @@ server<-shinyServer(function(input,output,session){
       datatable(subset_table)
     })
   })
+  
   observeEvent(input$GoCON, {
+    output$Sel <- renderInfoBox({
+      infoBox(
+        "Selected Variable", paste0(input$Contvariable),icon = icon("thumbs-up",lib="glyphicon"),
+        color = "blue"
+      )
+    })
+    output$Nmiss <- renderInfoBox({
+      infoBox(
+        "Missing values", paste0(colSums(is.na(values$df_data%>% select(input$Contvariable)))), 
+        icon = icon("list"),
+        color = "red",fill=TRUE
+      )
+    })
+    output$NonMiss <- renderInfoBox({
+      infoBox(
+        " Non Missing Values", paste0(colSums(!is.na(values$df_data%>% select(input$Contvariable)))), icon = icon("list"),
+        color = "olive",fill=TRUE
+      )
+    })  
     output$summary <- renderPrint({
       df <- values$df_data
       df <- df[,input$Contvariable]
@@ -110,11 +189,41 @@ server<-shinyServer(function(input,output,session){
     })
     output$histc<-renderPlot({
       df <- values$df_data
-      df <- df[,input$Contvariable]
-      boxplot(df,col="sky blue",border="purple",main=input$Contvariable)
+      pf <- df[,input$Contvariable]
+      ggplot(data=df, aes(x=pf)) + 
+        geom_histogram(color="grey", fill="darkgrey",bins=input$slider1) + xlim(min(pf),max(pf)) + ggtitle("Histogram") + 
+        geom_vline(aes(xintercept=mean(pf),
+                       color="red", linetype="continuous", size=0.5))
     })
+    output$histy<-renderPlot({
+      df <- values$df_data
+      gf <- df[,input$Contvariable]
+      ggplot(data=df, aes(x=df[,input$Contvariable]))+ 
+        geom_histogram(aes(y=..density..), colour="grey", fill="white",bins=input$slider2) + ggtitle("Density Plot") + 
+        geom_density(alpha=.2, fill="#FF6666")
+    })    
   })
   observeEvent(input$GoCAT, {
+    
+    output$Selc <- renderInfoBox({
+      infoBox(
+        "Selected Variable", paste0(input$Catvariable), icon = icon ("thumbs-up",lib="glyphicon"),
+        color = "blue",fill=TRUE
+      )
+    })
+    output$Nmissc <- renderInfoBox({
+      infoBox(
+        "Missing values", paste0(colSums(is.na(values$df_data%>% select(input$Catvariable)))),
+        icon = icon("list"),
+        color = "red",fill=TRUE
+      )
+    })
+    output$NonMissc <- renderInfoBox({
+      infoBox(
+        "Non Missing values", paste0(colSums(!is.na(values$df_data%>% select(input$Catvariable)))),icon = icon("list"),
+        color = "olive",fill=TRUE
+      )
+    })
     output$Truetable <- renderPrint({
       df <- values$df_data
       df <- df[,input$Catvariable]
