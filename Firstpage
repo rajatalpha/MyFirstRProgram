@@ -84,7 +84,12 @@ UI <-dashboardPage(
                          infoBoxOutput("Selc"),
                          infoBoxOutput("Nmissc"),
                          infoBoxOutput("NonMissc"),
-                         verbatimTextOutput("Truetable")))#end of tab item
+                         verbatimTextOutput("Truetable")),
+                       fluidRow(
+                         box(
+                           plotOutput("bart") 
+                         )
+                       ))#end of tab item
       )  # end Of last tabpanel
     ) # end Of tabsetpanel
   )         #Dashboard Body
@@ -191,16 +196,16 @@ server<-shinyServer(function(input,output,session){
       df <- values$df_data
       pf <- df[,input$Contvariable]
       ggplot(data=df, aes(x=pf)) + 
-        geom_histogram(color="grey", fill="darkgrey",bins=input$slider1) + xlim(min(pf),max(pf)) + ggtitle("Histogram") + 
+        geom_histogram(color="grey", fill="darkgrey",bins=input$slider1) +
+        geom_freqpoly(bins = input$slider1) + 
         geom_vline(aes(xintercept=mean(pf),
                        color="red", linetype="continuous", size=0.5))
     })
     output$histy<-renderPlot({
       df <- values$df_data
       gf <- df[,input$Contvariable]
-      ggplot(data=df, aes(x=df[,input$Contvariable]))+ 
-        geom_histogram(aes(y=..density..), colour="grey", fill="white",bins=input$slider2) + ggtitle("Density Plot") + 
-        geom_density(alpha=.2, fill="#FF6666")
+      ggplot(data=df, aes(x=gf))+ 
+        geom_histogram(aes(y=..density..), colour="black", fill="white",bins=input$slider2) +geom_density(alpha=.2, fill="#FF6666")
     })    
   })
   observeEvent(input$GoCAT, {
@@ -228,6 +233,12 @@ server<-shinyServer(function(input,output,session){
       df <- values$df_data
       df <- df[,input$Catvariable]
       table(df) 
+    })
+    output$bart<- renderPlot({
+      df <- values$df_data
+      tf <- df[,input$Catvariable]
+      ggplot(df, aes(tf)) +
+        geom_bar(stat="count") + labs(title=paste("Barplot of ",input$Catvariable)) + xlab(input$Catvariable)
     })
   })
   
