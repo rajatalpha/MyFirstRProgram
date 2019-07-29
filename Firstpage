@@ -197,16 +197,16 @@ server<-shinyServer(function(input,output,session){
       pf <- df[,input$Contvariable]
       ggplot(data=df, aes(x=pf)) + 
         geom_histogram(color="grey", fill="darkgrey",bins=input$slider1) +
-        geom_freqpoly(bins = input$slider1) + 
+        geom_freqpoly(bins = input$slider1) + xlab(input$Contvariable) + ggtitle(paste("Histogram with Frequency Polygon of ",input$Contvariable)) +
         geom_vline(aes(xintercept=mean(pf),
                        color="red", linetype="continuous", size=0.5))
     })
     output$histy<-renderPlot({
       df <- values$df_data
       gf <- df[,input$Contvariable]
-      ggplot(data=df, aes(x=gf))+ 
-        geom_histogram(aes(y=..density..), colour="black", fill="white",bins=input$slider2) +geom_density(alpha=.2, fill="#FF6666")
-    })    
+      ggplot(data=df, aes(x=gf))+ geom_histogram(aes(y=..density..), colour="black", fill="white",bins=input$slider2) + geom_density(alpha=.2, fill="#FF6666") + xlab(input$Contvariable) + ggtitle(paste("Density Plot of",input$Contvariable))  
+    })   
+    
   })
   observeEvent(input$GoCAT, {
     
