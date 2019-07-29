@@ -49,7 +49,9 @@ UI <-dashboardPage(
                          infoBoxOutput("DCAT")),
                        fluidRow(
                          h2('Visualizing Missing Data'),
-                         plotOutput("miss") 
+                         plotOutput("miss"),
+                         h2("Number Of Missing Values per column"),
+                         verbatimTextOutput("datamiss")
                        ),
                        fluidRow(
                          h4("Subsetted Dataset"),
@@ -74,9 +76,15 @@ UI <-dashboardPage(
                          )
                        ),
                        fluidRow(
+                         h2("Histogram Section"),
                          box(plotOutput("histc")),
                          box(plotOutput("histy"))
-                       ))
+                       )),
+                       fluidRow(
+                          h2("Boxplot Section"),
+                          box(plotOutput("boxo")),
+                          box(plotOutput("boxno"))
+                               ) 
       ),  # end of second tab panel
       tabPanel("Categorical variable",
                tabItem(tabName = "Categorical Variables",h2("Exploring Categorical Variable"),
@@ -84,12 +92,12 @@ UI <-dashboardPage(
                          infoBoxOutput("Selc"),
                          infoBoxOutput("Nmissc"),
                          infoBoxOutput("NonMissc"),
+                         h2("Table Count"),
                          verbatimTextOutput("Truetable")),
                        fluidRow(
-                         box(
-                           plotOutput("bart") 
-                         )
-                       ))#end of tab item
+                         h2("Barplot Section"),
+                         box(plotOutput("bart"), width = 12))
+                          )#end of tab item
       )  # end Of last tabpanel
     ) # end Of tabsetpanel
   )         #Dashboard Body
@@ -102,6 +110,11 @@ server<-shinyServer(function(input,output,session){
     values$df_data <- read.csv(input$file$datapath)
     
     output$data.frame <-DT::renderDataTable(values$df_data)
+    
+    output$datamiss<- renderPrint({
+      df<- values$df_data
+      colSums(sapply(df,is.na))
+      })
     
     output$struct<-renderPrint({
       df <- values$df_data
@@ -155,9 +168,10 @@ server<-shinyServer(function(input,output,session){
       )
     })
     output$miss<-renderPlot({
-      df <- values$df_data
+      df <- as.data.frame(values$df_data)
       aggr(df, numbers = TRUE, prop = c(TRUE, FALSE))
     }) 
+    
   })
   
   observeEvent(input$Go, {
@@ -206,6 +220,36 @@ server<-shinyServer(function(input,output,session){
       gf <- df[,input$Contvariable]
       ggplot(data=df, aes(x=gf))+ geom_histogram(aes(y=..density..), colour="black", fill="white",bins=input$slider2) + geom_density(alpha=.2, fill="#FF6666") + xlab(input$Contvariable) + ggtitle(paste("Density Plot of",input$Contvariable))  
     })   
+    output$boxo<-renderPlot({
+      df <- values$df_data
+      gf <- df[,input$Contvariable]
+      boxplot(gf,
+              main = paste("Boxplot of ",input$Contvariable," With Outliers"),
+              xlab = input$Contvariable,
+              col = "orange",
+              border = "brown",
+              horizontal = TRUE,
+              notch = TRUE
+      )  
+    })
+    output$boxno<-renderPlot({
+      df <- values$df_data
+      gf <- df[,input$Contvariable]
+      na1<-sum(is.na(gf))
+      m1 <- mean(gf, na.rm = T)
+      outlier <- boxplot.stats(gf)$out
+      mo <- mean(outlier)
+      gf <- ifelse(gf %in% outlier, NA,gf)
+      boxplot(gf,
+              main = paste("Boxplot of ",input$Contvariable," without outliers"),
+              xlab = input$Contvariable,
+              col = "orange",
+              border = "brown",
+              horizontal = TRUE,
+              notch = TRUE
+      ) 
+    })
+    
     
   })
   observeEvent(input$GoCAT, {
