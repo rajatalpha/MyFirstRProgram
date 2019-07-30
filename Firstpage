@@ -100,7 +100,16 @@ UI <-dashboardPage(
                          verbatimTextOutput("Truetable")),
                        fluidRow(
                          h2("Barplot Section"),
-                         box(plotOutput("bart"), width = 12))
+                         box(plotOutput("bart"), width = 12)),
+                       fluidRow(
+                         box(h2("Studying Relationship with Continous Variable")),
+                         box(selectInput(inputId = "Concat",
+                                     label = "Select the Continous Variable you want to visualize the realtionship with-",
+                                     choices="",selected=""
+                         ))),
+                       fluidRow(
+                         plotOutput("Concater")
+                       )
                           )#end of tab item
       ),   # end Of 3 tabpanel
       tabPanel("corrt",
@@ -290,6 +299,7 @@ server<-shinyServer(function(input,output,session){
   })
   observeEvent(input$GoCAT, {
     
+    updateSelectInput(session, "Concat", choices = names(values$df_data[ ,!sapply(values$df_data, is.factor)]))
     output$Selc <- renderInfoBox({
       infoBox(
         "Selected Variable", paste0(input$Catvariable), icon = icon ("thumbs-up",lib="glyphicon"),
@@ -320,6 +330,14 @@ server<-shinyServer(function(input,output,session){
       ggplot(df, aes(tf)) +
         geom_bar(stat="count") + labs(title=paste("Barplot of ",input$Catvariable)) + xlab(input$Catvariable)
     })
+    output$Concater<-renderPlot({
+      df <- values$df_data
+      conf <- df[,input$Concat]
+      catf <- df[,input$Catvariable]
+      ggplot(df,aes(x=catf,y=conf,fill=catf)) + geom_boxplot(outlier.colour="red", outlier.shape=8,
+                                                   outlier.size=4) + xlab(input$Catvariable) + ylab(input$Concat)
+    })
+    
   })
   observeEvent(input$Gocorrt, {
     df <- values$df_data
