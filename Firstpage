@@ -6,6 +6,7 @@ library(DataExplorer) ##Categorical Exploration
 library(VIM)          ##Missing Value Imputation
 library(tidyverse)    ## for %>%
 library(ggplot2)
+library(ggcorrplot)
 
 UI <-dashboardPage(
   dashboardHeader(title="Data Exploration"),
@@ -30,7 +31,10 @@ UI <-dashboardPage(
                            choices="",selected=""
                ),
                actionButton(inputId = "GoCAT",label = "Go")
-      )
+      ),
+      menuItem("Correlation Matrix",tabName = "corrt",icon=icon("table"),
+               actionButton(inputId = "Gocorrt",label = "Submit")
+               )
     )
   ),
   dashboardBody(
@@ -69,10 +73,10 @@ UI <-dashboardPage(
                          infoBoxOutput("NonMiss")),
                        fluidRow(
                          box(
-                           sliderInput("slider1", "Slider input:", 0, 100, 2)
+                           sliderInput("slider1", "Slider input 1 :", 0, 100, 2)
                          ),
                          box(
-                           sliderInput("slider2", "Slider input:", 1, 100,2)
+                           sliderInput("slider2", "Slider input 2 :", 1, 100,2)
                          )
                        ),
                        fluidRow(
@@ -98,7 +102,39 @@ UI <-dashboardPage(
                          h2("Barplot Section"),
                          box(plotOutput("bart"), width = 12))
                           )#end of tab item
-      )  # end Of last tabpanel
+      ),   # end Of 3 tabpanel
+      tabPanel("corrt",
+               tabItem(tabName = "corrt",
+                       fluidRow(
+                       h2("Correlation Matrix for the Entire Dataset"),
+                       box(plotOutput("cot"),width=12,height=1200)),
+                       fluidRow(
+                         numericInput("thd", "Enter the threshold : ",0.1, min = 0, max = 1,0.1),
+                         actionButton(inputId = "Gochart",label = "Go")),
+                       fluidRow(
+                         h3("Significant pairs based on Threshold selected are-"),
+                         DT::dataTableOutput("pairs")
+                       ),
+                       fluidRow(
+                         box(selectInput(inputId = "Contvariable1",
+                                         label = "Select  1st Variable",
+                                         choices="",selected=""
+                         )),
+                         box(selectInput(inputId = "Contvariable2",
+                                         label = "Select 2nd Variable",
+                                         choices="",selected=""
+                         )),
+                         box(selectInput(inputId = "Catvariable1",
+                                         label = "Select a Grouping variable(Factor) Variable",
+                                         choices="",selected=""
+                         ))
+                       ),
+                       fluidRow(
+                         box(plotOutput("Coter")),
+                         box(plotOutput("Potter"))
+                       )
+               )# end of tab Item 
+               )# end of last tab panel
     ) # end Of tabsetpanel
   )         #Dashboard Body
 )         ###End of Dashboard page
@@ -284,6 +320,48 @@ server<-shinyServer(function(input,output,session){
       ggplot(df, aes(tf)) +
         geom_bar(stat="count") + labs(title=paste("Barplot of ",input$Catvariable)) + xlab(input$Catvariable)
     })
+  })
+  observeEvent(input$Gocorrt, {
+    df <- values$df_data
+    continous<-as.matrix(df[ ,!sapply(df, is.factor)])
+    is.na(continous) <- sapply(continous, is.infinite)
+    continous[is.na(continous)] <- 0
+    continous[is.nan(continous)] <- 0
+    p<-cor(continous)
+    output$cot<-renderPlot({
+      ggcorrplot(p,hc.order = TRUE, type = "lower",
+                 lab = TRUE,insig = "blank")   ##Putting insignificant Correlations as blank
+       },height=1200)
+    updateSelectInput(session, "Contvariable1", choices = names(values$df_data[ ,!sapply(values$df_data, is.factor)]))
+    updateSelectInput(session, "Contvariable2", choices = names(values$df_data[ ,!sapply(values$df_data, is.factor)]))
+    updateSelectInput(session, "Catvariable1", choices = names(values$df_data[,sapply(values$df_data, is.factor)]))
+  })
+  observeEvent(input$Gochart, {
+    df <- values$df_data
+    continous<-as.matrix(df[ ,!sapply(df, is.factor)])
+    is.na(continous) <- sapply(continous, is.infinite)
+    continous[is.na(continous)] <- 0
+    continous[is.nan(continous)] <- 0
+    p<-cor(continous)
+    pr<-setDT(melt(p))[order(value)]
+    pf<-subset(pr,pr$Var1!=pr$Var2)
+    cf<-subset(pf,pf$value > input$thd)
+    output$pairs <-DT::renderDataTable(cf)
+    output$Coter<-renderPlot({
+      df <- values$df_data
+      x1 <- df[,input$Contvariable1]
+      y1 <- df[,input$Contvariable2]
+      ggplot(data=df, aes(x=x1,y=y1)) + geom_point() +  geom_smooth(method=lm) + xlab(input$Contvariable1) + ylab(input$Contvariable2)  #se is don't display the standard error
+    })
+    output$Potter<-renderPlot({
+      df <- values$df_data
+      x1 <- df[,input$Contvariable1]
+      y1 <- df[,input$Contvariable2]
+      g1 <- df[,input$Catvariable1]
+      ggplot(data=df, aes(x=x1,y=y1,shape=g1, color=g1)) + geom_point() + xlab(input$Contvariable1) + ylab(input$Contvariable2)  #se is don't display the standard error
+    })
+    
+    
   })
   
 })
