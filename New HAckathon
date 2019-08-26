@@ -1,51 +1,679 @@
 library(shiny)
 library(shinydashboard)
-UI<-
-  dashboardPage(
-    dashboardHeader(title="Data Exploration"),
-    dashboardSidebar(
-      fileInput("file","Upload CSV files",multiple=TRUE,accept=("text/comma")),
-      sidebarMenu(id="tabs",
-                  menuItem(" FULL Data",tabName="Data",icon=icon("table"),startExpanded = TRUE),
-                  menuItem("Continous variables",tabName="Continous Variables",icon = icon("th")),
-                  menuItem("Categorical variables",tabName="Categorical Variables",icon = icon("th"))
-      )
-    ),
-    dashboardBody(
-      tabItems(
-        tabItem(tabName="Data",tableOutput("data.frame")),
-        tabItem(tabName="Continous Variables"),
-        tabItem(tabName= "Categorical Variables")
+library(DT)           ##Rendering datatable
+library(psych)        ##Summary
+library(DataExplorer) ##Categorical Exploration
+library(VIM)          ##Missing Value Imputation
+library(tidyverse)    ## for %>%
+library(ggplot2)
+library(ggcorrplot)
+
+UI <-dashboardPage(
+  dashboardHeader(title="Data Exploration"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Full data",tabName="Data",icon=icon("table"),startExpanded = TRUE,
+               fileInput("file","Upload CSV files",multiple=TRUE,accept=("text/comma")),
+               selectInput("select", "Select Variable","None", "placeholder 1",multiple = TRUE),
+               actionButton(inputId = "Go",label = "Go")
+      ),
+      menuItem("Continous variables",tabName="Continous Variables",icon=icon("table"),
+               selectInput(inputId = "Contvariable",
+                           label = "Select Variable",
+                           choices="",selected=""
+               ),
+               # button
+               actionButton(inputId = "GoCON",label = "Go")
+      ),
+      menuItem("Categorical variables",tabName="Categorical variables",icon=icon("table"),
+               selectInput(inputId = "Catvariable",
+                           label = "Select Variable",
+                           choices="",selected=""
+               ),
+               actionButton(inputId = "GoCAT",label = "Go")
+      ),
+      menuItem("Correlation Matrix",tabName = "corrt",icon=icon("table"),
+               actionButton(inputId = "Gocorrt",label = "Submit")
       )
     )
-  )
-)
+  ),
+  dashboardBody(
+    tabsetPanel(
+      tabPanel("Data",
+               tabItem(tabName="Data",
+                       fluidRow(
+                         h2('A brief Look into the Datset'),
+                         DT::dataTableOutput("data.frame")),
+                       fluidRow(
+                         h2("Conversion to factor variables!!! "),
+                         box(selectInput(inputId = "convert",
+                                         label = "Do you want any of your columns to be converted into factor variable: ",
+                                         choices="",selected="",multiple = TRUE),background="blue",solidHeader = TRUE),
+                         box(actionButton(inputId = "change",label = "CHANGE"))),
+                       fluidRow(
+                         h2('Basic Summary'),
+                         infoBoxOutput("Ro"),
+                         infoBoxOutput("Co"),
+                         infoBoxOutput("Mi"),
+                         infoBoxOutput("No"),
+                         infoBoxOutput("DCON"),
+                         infoBoxOutput("DCAT")),
+                       fluidRow(
+                         h2('Visualizing Missing Data'),
+                         plotOutput("miss"),
+                         h2("Number Of Missing Values per column"),
+                         verbatimTextOutput("datamiss")
+                       ),
+                       fluidRow(
+                         h4("Subsetted Dataset"),
+                         DT::dataTableOutput("data.frame2"),
+                         h4("Structure of Dataset"),
+                         verbatimTextOutput("struct"),
+                         h4("Summary of dataset"),
+                         verbatimTextOutput("Summary")))), #end of 1st tab panel
+      tabPanel("Continous variable",
+               tabItem(tabName = "Continous Variables",
+                       fluidRow(
+                         h2("Exploring Continous Variable"),
+                         infoBoxOutput("Sel"),
+                         infoBoxOutput("Nmiss"),
+                         infoBoxOutput("NonMiss")),
+                       fluidRow(
+                         box(
+                           sliderInput("slider1", "Slider input 1 :", 0, 100, 2)
+                         ),
+                         box(
+                           sliderInput("slider2", "Slider input 2 :", 1, 100,2)
+                         )
+                       ),
+                       fluidRow(
+                         h2("Histogram Section"),
+                         box(plotOutput("histc"),solidHeader = TRUE),
+                         box(plotOutput("histy"),solidHeader = TRUE)
+                       )),
+               fluidRow(
+                 h2("Boxplot Section"),
+                 box(plotOutput("boxo"),background = "maroon", solidHeader = TRUE),
+                 box(plotOutput("boxno"),background = "teal", solidHeader = TRUE)
+               ),
+               fluidRow(
+                 h2("Relationship between two Continous variables "),
+                 box(selectInput(inputId = "mixture",
+                                 label = "Select the Continous Variable you want to visualize the realtionship with-",
+                                 choices="",selected=""),background="purple",solidHeader = TRUE),
+                 box(plotOutput("mix"),background="purple",solidHeader = TRUE)
+               )
+      ),  # end of second tab panel
+      tabPanel("Categorical variable",
+               tabItem(tabName = "Categorical Variables",h2("Exploring Categorical Variable"),
+                       fluidRow(
+                         infoBoxOutput("Selc"),
+                         infoBoxOutput("Nmissc"),
+                         infoBoxOutput("NonMissc"),
+                         h2("Table Count"),
+                         verbatimTextOutput("Truetable")),
+                       fluidRow(
+                         h2("Barplot Section"),
+                         box(plotOutput("bart"), width = 12,solidHeader = TRUE,background='blue')),
+                       fluidRow(
+                         box(h2("Studying Relationship with Continous Variable"),background = "green", solidHeader = TRUE),
+                         box(selectInput(inputId = "Concat",
+                                         label = "Select the Continous Variable you want to visualize the realtionship with-",
+                                         choices="",selected=""
+                         ),solidHeader = TRUE,background='maroon')),
+                       fluidRow(
+                         plotOutput("Concater")
+                       )
+               )#end of tab item
+      ),   # end Of 3 tabpanel
+      tabPanel("corrt",
+               tabItem(tabName = "corrt",
+                       fluidRow(
+                         h2("Correlation Matrix for the Entire Dataset"),
+                         box(plotOutput("cot"),width=12,height=1200)),
+                       fluidRow(
+                         numericInput("thd", "Enter the threshold : ",0.1, min = 0, max = 1,0.1),
+                         actionButton(inputId = "Gochart",label = "Go")),
+                       fluidRow(
+                         h3("Significant pairs based on Threshold selected are-"),
+                         DT::dataTableOutput("pairs")
+                       ),
+                       fluidRow(
+                         box(selectInput(inputId = "Contvariable1",
+                                         label = "Select  1st Variable",
+                                         choices="",selected=""
+                         ),solidHeader = TRUE),
+                         box(selectInput(inputId = "Contvariable2",
+                                         label = "Select 2nd Variable",
+                                         choices="",selected=""
+                         ),solidHeader = TRUE),
+                         box(selectInput(inputId = "Catvariable1",
+                                         label = "Select a Grouping variable(Factor) Variable",
+                                         choices="",selected=""
+                         ),solidHeader = TRUE)
+                       ),
+                       fluidRow(
+                         box(plotOutput("Cotter"),solidHeader=TRUE,width=12),
+                         box(plotOutput("Potter"),solidHeader = TRUE,width=12)
+                       )
+               )# end of tab Item 
+      )# end of last tab panel
+    ) # end Of tabsetpanel
+  )         #Dashboard Body
+)         ###End of Dashboard page
 
-server<-shinyServer(function(input,output){
+server<-shinyServer(function(input,output,session){
   values <- reactiveValues(df_data = NULL)
   
   observeEvent(input$file, {
+    
     values$df_data <- read.csv(input$file$datapath)
+    
+    output$data.frame <-DT::renderDataTable(values$df_data)
+  })  
+  
+  ## update 'columns' selector
+  observeEvent(input$file, {
+    updateSelectInput(session, "select", choices = names(values$df_data))
+    updateSelectInput(session, "convert", choices = names(values$df_data))
+    updateSelectInput(session, "Contvariable", choices = names(values$df_data[ ,!sapply(values$df_data, is.factor)]))
+    updateSelectInput(session, "Catvariable", choices = names(values$df_data[,sapply(values$df_data, is.factor)]))
+  
+    output$datamiss<- renderPrint({
+      df<- values$df_data
+      colSums(sapply(df,is.na))
+    })
+    
+    output$struct<-renderPrint({
+      df <- values$df_data
+      str(df)
+    })
+    
+    output$Summary<-renderPrint({
+      df <- values$df_data
+      describe(df)})
+    
+    output$Ro <- renderInfoBox({
+      infoBox(
+        "Row Count", paste0(nrow(values$df_data)), icon = icon("list"),
+        color = "blue",fill=TRUE
+      )
+    })
+    output$Co <- renderInfoBox({
+      infoBox(
+        "Column Count", paste0(ncol(values$df_data)), icon = icon("list"),
+        color = "orange",fill=TRUE
+      )
+    })
+    output$Mi <- renderInfoBox({
+      infoBox(
+        "Missing Values", paste0(sum(is.na(values$df_data))), icon = icon("list"),
+        color = "red",fill=TRUE
+      )
+    }) 
+    output$No <- renderInfoBox({
+      infoBox(
+        "Non missing values", paste0(unname(table(is.na(values$df_data))[1])), 
+        icon = icon("thumbs-up",lib="glyphicon"),
+        color = "olive",fill=TRUE
+      )
+    })
+    output$DCON <- renderInfoBox({
+      infoBox(
+        "Continuous Columns Count", paste0(ncol(values$df_data[ ,!sapply(values$df_data, is.factor)])), icon = icon("list"),
+        color = "maroon",fill=TRUE
+      )
+    })
+    output$DCAT <- renderInfoBox({
+      infoBox(
+        "Categorical Column Count", paste0(ncol(values$df_data[ ,sapply(values$df_data, is.factor)])), icon = icon("list"),
+        color = "purple",fill=TRUE
+      )
+    })
+    output$miss<-renderPlot({
+      df <- as.data.frame(values$df_data)
+      aggr(df, numbers = TRUE, prop = c(TRUE, FALSE))
+    }) 
+    
+  observeEvent(input$Go, {
+    output$data.frame2 <- DT::renderDataTable({
+      subset_table <- values$df_data[, input$select, drop = F]
+      datatable(subset_table)
+    })
+    })
+  observeEvent(input$GoCON, {
+    updateSelectInput(session, "mixture", choices = names(values$df_data[ ,!sapply(values$df_data, is.factor)]))
+    output$Sel <- renderInfoBox({
+      infoBox(
+        "Selected Variable", paste0(input$Contvariable),icon = icon("thumbs-up",lib="glyphicon"),
+        color = "blue"
+      )
+    })
+    output$Nmiss <- renderInfoBox({
+      infoBox(
+        "Missing values", paste0(colSums(is.na(values$df_data%>% select(input$Contvariable)))), 
+        icon = icon("list"),
+        color = "red",fill=TRUE
+      )
+    })
+    output$NonMiss <- renderInfoBox({
+      infoBox(
+        " Non Missing Values", paste0(colSums(!is.na(values$df_data%>% select(input$Contvariable)))), icon = icon("list"),
+        color = "olive",fill=TRUE
+      )
+    })  
+    output$summary <- renderPrint({
+      df <- values$df_data
+      df <- df[,input$Contvariable]
+      describe(df) 
+    })
+    output$histc<-renderPlot({
+      df <- values$df_data
+      pf <- df[,input$Contvariable]
+      ggplot(data=df, aes(x=pf)) + 
+        geom_histogram(color="grey", fill="darkgrey",bins=input$slider1) +
+        geom_freqpoly(bins = input$slider1) + xlab(input$Contvariable) + ggtitle(paste("Histogram with Frequency Polygon of ",input$Contvariable)) +
+        geom_vline(aes(xintercept=mean(pf),
+                       color="red", linetype="continuous", size=0.5))  + theme(
+                         plot.title = element_text(color="black", size=16,face = "bold"),
+                         axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+                         axis.title.y = element_text(color = "black", size = 14, face = "bold")
+                       )
+    })
+    output$histy<-renderPlot({
+      df <- values$df_data
+      gf <- df[,input$Contvariable]
+      ggplot(data=df, aes(x=gf))+ geom_histogram(aes(y=..density..), colour="black", fill="white",bins=input$slider2) + geom_density(alpha=.2, fill="#FF6666") + xlab(input$Contvariable) + ggtitle(paste("Density Plot of",input$Contvariable)) + theme(
+        plot.title = element_text(color="black", size=16,face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.y = element_text(color = "black", size = 14, face = "bold")
+      )  
+    })   
+    output$boxo<-renderPlot({
+      df <- values$df_data
+      gf <- df[,input$Contvariable]
+      boxplot(gf,
+              main = paste("Boxplot of ",input$Contvariable," With Outliers"),
+              xlab = input$Contvariable,
+              col = "orange",
+              border = "brown",
+              horizontal = TRUE,
+              notch = TRUE
+      )  
+    })
+    output$boxno<-renderPlot({
+      df <- values$df_data
+      gf <- df[,input$Contvariable]
+      na1<-sum(is.na(gf))
+      m1 <- mean(gf, na.rm = T)
+      outlier <- boxplot.stats(gf)$out
+      mo <- mean(outlier)
+      gf <- ifelse(gf %in% outlier, NA,gf)
+      boxplot(gf,
+              main = paste("Boxplot of ",input$Contvariable," without outliers"),
+              xlab = input$Contvariable,
+              col = "orange",
+              border = "brown",
+              horizontal = TRUE,
+              notch = TRUE
+      ) 
+    })
+    output$mix <- renderPlot({
+      df <- values$df_data
+      x1 <- df[,input$Contvariable]
+      y1 <- df[,input$mixture]
+      ggplot(data=df, aes(x=x1,y=y1)) + geom_point() +  geom_smooth(method=lm) + xlab(input$Contvariable) + ylab(input$mixture) + theme(
+        plot.title = element_text(color="black", size=16,face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.y = element_text(color = "black", size = 14, face = "bold")
+      ) #se is don't display the standard error
+    })
+    
+    
+    
   })
-  output$data.frame <- renderTable(values$df_data)
+  observeEvent(input$GoCAT, {
+    
+    updateSelectInput(session, "Concat", choices = names(values$df_data[ ,!sapply(values$df_data, is.factor)]))
+    output$Selc <- renderInfoBox({
+      infoBox(
+        "Selected Variable", paste0(input$Catvariable), icon = icon ("thumbs-up",lib="glyphicon"),
+        color = "blue",fill=TRUE
+      )
+    })
+    output$Nmissc <- renderInfoBox({
+      infoBox(
+        "Missing values", paste0(colSums(is.na(values$df_data%>% select(input$Catvariable)))),
+        icon = icon("list"),
+        color = "red",fill=TRUE
+      )
+    })
+    output$NonMissc <- renderInfoBox({
+      infoBox(
+        "Non Missing values", paste0(colSums(!is.na(values$df_data%>% select(input$Catvariable)))),icon = icon("list"),
+        color = "olive",fill=TRUE
+      )
+    })
+    output$Truetable <- renderPrint({
+      df <- values$df_data
+      df <- df[,input$Catvariable]
+      table(df) 
+    })
+    output$bart<- renderPlot({
+      df <- values$df_data
+      tf <- df[,input$Catvariable]
+      ggplot(df, aes(tf)) +
+        geom_bar(stat="count") + labs(title=paste("Barplot of ",input$Catvariable)) + xlab(input$Catvariable) + theme(
+          plot.title = element_text(color="black", size=16,face = "bold"),
+          axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+          axis.title.y = element_text(color = "black", size = 14, face = "bold")
+        )
+    })
+    output$Concater<-renderPlot({
+      df <- values$df_data
+      conf <- df[,input$Concat]
+      catf <- df[,input$Catvariable]
+      ggplot(df,aes(x=catf,y=conf,fill=catf)) + geom_boxplot(outlier.colour="red", outlier.shape=8,
+                                                             outlier.size=4) + xlab(input$Catvariable) + ylab(input$Concat) + theme(
+                                                               plot.title = element_text(color="black", size=16,face = "bold"),
+                                                               axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+                                                               axis.title.y = element_text(color = "black", size = 14, face = "bold")
+                                                             )
+    })
+    
+  })
+  observeEvent(input$Gocorrt, {
+    df <- values$df_data
+    continous<-as.matrix(df[ ,!sapply(df, is.factor)])
+    is.na(continous) <- sapply(continous, is.infinite)
+    continous[is.na(continous)] <- 0
+    continous[is.nan(continous)] <- 0
+    p<-cor(continous)
+    output$cot<-renderPlot({
+      ggcorrplot(p,hc.order = TRUE, type = "lower",
+                 lab = TRUE,insig = "blank")   ##Putting insignificant Correlations as blank
+    },height=1200)
+    updateSelectInput(session, "Contvariable1", choices = names(values$df_data[ ,!sapply(values$df_data, is.factor)]))
+    updateSelectInput(session, "Contvariable2", choices = names(values$df_data))
+    updateSelectInput(session, "Catvariable1", choices = names(values$df_data[,sapply(values$df_data, is.factor)]))
+  })
+  observeEvent(input$Gochart, {
+    df <- values$df_data
+    continous<-as.matrix(df[ ,!sapply(df, is.factor)])
+    is.na(continous) <- sapply(continous, is.infinite)
+    continous[is.na(continous)] <- 0
+    continous[is.nan(continous)] <- 0
+    p<-cor(continous)
+    pr<-setDT(melt(p))[order(value)]
+    pf<-subset(pr,pr$Var1!=pr$Var2)
+    cf<-subset(pf,pf$value > input$thd)
+    output$pairs <-DT::renderDataTable(cf)
+    output$Cotter<-renderPlot({
+      df <- values$df_data
+      x1 <- df[,input$Contvariable1]
+      y1 <- df[,input$Contvariable2]
+      ggplot(data=df, aes(x=x1,y=y1)) + geom_point() + geom_smooth(method=lm) + xlab(input$Contvariable1) + ylab(input$Contvariable2) + theme(
+        plot.title = element_text(color="black", size=16,face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.y = element_text(color = "black", size = 14, face = "bold")
+      ) 
+    })
+    output$Potter<-renderPlot({
+      df <- values$df_data
+      x1 <- df[,input$Contvariable1]
+      y1 <- df[,input$Contvariable2]
+      g1 <- df[,input$Catvariable1]
+      ggplot(data=df, aes(x=x1,y=y1,shape=g1, color=g1)) + geom_point() + xlab(input$Contvariable1) + ylab(input$Contvariable2) + theme(
+        plot.title = element_text(color="black", size=16,face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.y = element_text(color = "black", size = 14, face = "bold")
+      ) 
+    })
+  })
+})  
+ ###################################################################   
+    observeEvent(input$change, {
+      df <- values$df_data
+      df[,input$convert]<- lapply(df[,input$convert],factor)
+      updateSelectInput(session, "Contvariable", choices = names(df[ ,!sapply(df, is.factor)]))
+      updateSelectInput(session, "Catvariable", choices = names(df[,sapply(df, is.factor)]))
+    
+    output$datamiss<- renderPrint({
+      colSums(sapply(df,is.na))
+    })
+    
+    output$struct<-renderPrint({
+      str(df)
+    })
+    
+    output$Summary<-renderPrint({
+      describe(df)})
+    
+    output$Ro <- renderInfoBox({
+      infoBox(
+        "Row Count", paste0(nrow(df)), icon = icon("list"),
+        color = "blue",fill=TRUE
+      )
+    })
+    output$Co <- renderInfoBox({
+      infoBox(
+        "Column Count", paste0(ncol(df)), icon = icon("list"),
+        color = "orange",fill=TRUE
+      )
+    })
+    output$Mi <- renderInfoBox({
+      infoBox(
+        "Missing Values", paste0(sum(is.na(df))), icon = icon("list"),
+        color = "red",fill=TRUE
+      )
+    }) 
+    output$No <- renderInfoBox({
+      infoBox(
+        "Non missing values", paste0(unname(table(is.na(df))[1])), 
+        icon = icon("thumbs-up",lib="glyphicon"),
+        color = "olive",fill=TRUE
+      )
+    })
+    output$DCON <- renderInfoBox({
+      infoBox(
+        "Continuous Columns Count", paste0(ncol(values$df_data[ ,!sapply(df, is.factor)])), icon = icon("list"),
+        color = "maroon",fill=TRUE
+      )
+    })
+    output$DCAT <- renderInfoBox({
+      infoBox(
+        "Categorical Column Count", paste0(ncol(values$df_data[ ,sapply(df, is.factor)])), icon = icon("list"),
+        color = "purple",fill=TRUE
+      )
+    })
+    output$miss<-renderPlot({
+      aggr(df, numbers = TRUE, prop = c(TRUE, FALSE))
+    }) 
+  observeEvent(input$Go, {
+    output$data.frame2 <- DT::renderDataTable({
+      subset_table <- df[, input$select, drop = F]
+      datatable(subset_table)
+    })
+  })
+    
+  observeEvent(input$GoCON, {
+    updateSelectInput(session, "mixture", choices = names(df[ ,!sapply(df, is.factor)]))
+    output$Sel <- renderInfoBox({
+      infoBox(
+        "Selected Variable", paste0(input$Contvariable),icon = icon("thumbs-up",lib="glyphicon"),
+        color = "blue"
+      )
+    })
+    output$Nmiss <- renderInfoBox({
+      infoBox(
+        "Missing values", paste0(colSums(is.na(df%>% select(input$Contvariable)))), 
+        icon = icon("list"),
+        color = "red",fill=TRUE
+      )
+    })
+    output$NonMiss <- renderInfoBox({
+      infoBox(
+        " Non Missing Values", paste0(colSums(!is.na(df%>% select(input$Contvariable)))), icon = icon("list"),
+        color = "olive",fill=TRUE
+      )
+    })  
+    output$summary <- renderPrint({
+      df <- df[,input$Contvariable]
+      describe(df) 
+    })
+    output$histc<-renderPlot({
+      pf <- df[,input$Contvariable]
+      ggplot(data=df, aes(x=pf)) + 
+        geom_histogram(color="grey", fill="darkgrey",bins=input$slider1) +
+        geom_freqpoly(bins = input$slider1) + xlab(input$Contvariable) + ggtitle(paste("Histogram with Frequency Polygon of ",input$Contvariable)) +
+        geom_vline(aes(xintercept=mean(pf),
+                       color="red", linetype="continuous", size=0.5))  + theme(
+                         plot.title = element_text(color="black", size=16,face = "bold"),
+                         axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+                         axis.title.y = element_text(color = "black", size = 14, face = "bold")
+                       )
+    })
+    output$histy<-renderPlot({
+      gf <- df[,input$Contvariable]
+      ggplot(data=df, aes(x=gf))+ geom_histogram(aes(y=..density..), colour="black", fill="white",bins=input$slider2) + geom_density(alpha=.2, fill="#FF6666") + xlab(input$Contvariable) + ggtitle(paste("Density Plot of",input$Contvariable)) + theme(
+        plot.title = element_text(color="black", size=16,face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.y = element_text(color = "black", size = 14, face = "bold")
+      )  
+    })   
+    output$boxo<-renderPlot({
+      gf <- df[,input$Contvariable]
+      boxplot(gf,
+              main = paste("Boxplot of ",input$Contvariable," With Outliers"),
+              xlab = input$Contvariable,
+              col = "orange",
+              border = "brown",
+              horizontal = TRUE,
+              notch = TRUE
+      )  
+    })
+    output$boxno<-renderPlot({
+      gf <- df[,input$Contvariable]
+      na1<-sum(is.na(gf))
+      m1 <- mean(gf, na.rm = T)
+      outlier <- boxplot.stats(gf)$out
+      mo <- mean(outlier)
+      gf <- ifelse(gf %in% outlier, NA,gf)
+      boxplot(gf,
+              main = paste("Boxplot of ",input$Contvariable," without outliers"),
+              xlab = input$Contvariable,
+              col = "orange",
+              border = "brown",
+              horizontal = TRUE,
+              notch = TRUE
+      ) 
+    })
+    output$mix <- renderPlot({
+      x1 <- df[,input$Contvariable]
+      y1 <- df[,input$mixture]
+      ggplot(data=df, aes(x=x1,y=y1)) + geom_point() +  geom_smooth(method=lm) + xlab(input$Contvariable) + ylab(input$mixture) + theme(
+        plot.title = element_text(color="black", size=16,face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.y = element_text(color = "black", size = 14, face = "bold")
+      ) #se is don't display the standard error
+    })
+    
+    
+    
+  })
+  observeEvent(input$GoCAT, {
+    
+    updateSelectInput(session, "Concat", choices = names(df[ ,!sapply(df, is.factor)]))
+    output$Selc <- renderInfoBox({
+      infoBox(
+        "Selected Variable", paste0(input$Catvariable), icon = icon ("thumbs-up",lib="glyphicon"),
+        color = "blue",fill=TRUE
+      )
+    })
+    output$Nmissc <- renderInfoBox({
+      infoBox(
+        "Missing values", paste0(colSums(is.na(df%>% select(input$Catvariable)))),
+        icon = icon("list"),
+        color = "red",fill=TRUE
+      )
+    })
+    output$NonMissc <- renderInfoBox({
+      infoBox(
+        "Non Missing values", paste0(colSums(!is.na(df%>% select(input$Catvariable)))),icon = icon("list"),
+        color = "olive",fill=TRUE
+      )
+    })
+    output$Truetable <- renderPrint({
+      df <- df[,input$Catvariable]
+      table(df) 
+    })
+    output$bart<- renderPlot({
+      tf <- df[,input$Catvariable]
+      ggplot(df, aes(tf)) +
+        geom_bar(stat="count") + labs(title=paste("Barplot of ",input$Catvariable)) + xlab(input$Catvariable) + theme(
+          plot.title = element_text(color="black", size=16,face = "bold"),
+          axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+          axis.title.y = element_text(color = "black", size = 14, face = "bold")
+        )
+    })
+    output$Concater<-renderPlot({
+      conf <- df[,input$Concat]
+      catf <- df[,input$Catvariable]
+      ggplot(df,aes(x=catf,y=conf,fill=catf)) + geom_boxplot(outlier.colour="red", outlier.shape=8,
+                                                             outlier.size=4) + xlab(input$Catvariable) + ylab(input$Concat) + theme(
+                                                               plot.title = element_text(color="black", size=16,face = "bold"),
+                                                               axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+                                                               axis.title.y = element_text(color = "black", size = 14, face = "bold")
+                                                             )
+    })
+    
+  })
+  observeEvent(input$Gocorrt, {
+    continous<-as.matrix(df[ ,!sapply(df, is.factor)])
+    is.na(continous) <- sapply(continous, is.infinite)
+    continous[is.na(continous)] <- 0
+    continous[is.nan(continous)] <- 0
+    p<-cor(continous)
+    output$cot<-renderPlot({
+      ggcorrplot(p,hc.order = TRUE, type = "lower",
+                 lab = TRUE,insig = "blank")   ##Putting insignificant Correlations as blank
+    },height=1200)
+    updateSelectInput(session, "Contvariable1", choices = names(df[ ,!sapply(df, is.factor)]))
+    updateSelectInput(session, "Contvariable2", choices = names(df))
+    updateSelectInput(session, "Catvariable1", choices = names(df[,sapply(df, is.factor)]))
+  })
+  observeEvent(input$Gochart, {
+    continous<-as.matrix(df[ ,!sapply(df, is.factor)])
+    is.na(continous) <- sapply(continous, is.infinite)
+    continous[is.na(continous)] <- 0
+    continous[is.nan(continous)] <- 0
+    p<-cor(continous)
+    pr<-setDT(melt(p))[order(value)]
+    pf<-subset(pr,pr$Var1!=pr$Var2)
+    cf<-subset(pf,pf$value > input$thd)
+    output$pairs <-DT::renderDataTable(cf)
+    output$Cotter<-renderPlot({
+      x1 <- df[,input$Contvariable1]
+      y1 <- df[,input$Contvariable2]
+      ggplot(data=df, aes(x=x1,y=y1)) + geom_point() + geom_smooth(method=lm) + xlab(input$Contvariable1) + ylab(input$Contvariable2) + theme(
+        plot.title = element_text(color="black", size=16,face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.y = element_text(color = "black", size = 14, face = "bold")
+      ) 
+    })
+    output$Potter<-renderPlot({
+      x1 <- df[,input$Contvariable1]
+      y1 <- df[,input$Contvariable2]
+      g1 <- df[,input$Catvariable1]
+      ggplot(data=df, aes(x=x1,y=y1,shape=g1, color=g1)) + geom_point() + xlab(input$Contvariable1) + ylab(input$Contvariable2) + theme(
+        plot.title = element_text(color="black", size=16,face = "bold"),
+        axis.title.x = element_text(color = "black", size = 14, face = "bold"),
+        axis.title.y = element_text(color = "black", size = 14, face = "bold")
+      ) 
+    })
+  })
+})
 })
 
 shinyApp(UI, server)
-https://community.rstudio.com/t/shinydashboard-rshiny/11820/8
-https://rstudio.github.io/shinydashboard/structure.html#dynamic-content-1
 
-##tuesday morning##
-```{r}
-htrain<-read.csv('housing_train.csv')
-str(htrain)
-```
-
-```{r}
-continous<-htrain[ ,!sapply(htrain, is.factor)]
-str(continous)
-```
-
-```{r}
-categorical<-htrain[,sapply(htrain, is.factor)]
-str(categorical)
-```
