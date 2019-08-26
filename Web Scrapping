@@ -1,0 +1,74 @@
+Web Scrapping: http://uc-r.github.io/scraping
+# Scrapping data from Webpage
+library(rvest)
+library(XML)
+library(magrittr)
+library(stringr)  # for str_split_fixed
+library(tidyr)  #
+library(reshape2)  # for getting id
+con <- url("http://marvel-loki.surge.sh", "rb") 
+scrapp <- read_html(con)
+scdata<-scrapp %>% html_nodes("h2")%>% html_text()
+h2<-as.data.frame(scdata)
+names(h2)[1]<-"Name"
+View(h2)
+######################
+scd123<-scrapp%>% html_nodes("h4")%>% html_text()
+A<-as.data.frame(str_split_fixed(scd123, ":", 2))
+View(A)
+my_data34 <- A %>% 
+  group_by(V1) %>% 
+  mutate(grouped_id = row_number())
+View(my_data34)
+class(my_data34)
+my_data3 <- spread(my_data34, 
+                   key = "V1",
+                   value = "V2"
+)
+class(my_data3)
+my_data3$grouped_id<-NULL
+my_data3<-as.data.frame(my_data3)
+class(my_data3)
+names(my_data3)[7]<-"Id"
+View(my_data3)
+my_data3<-as.data.frame(my_data3)
+my_data3$grouped_id<-NULL
+my_data3<-as.data.frame(my_data3)
+class(my_data3)
+my_data3$`Appearances `
+View(my_data3)
+my_data3$grouped_id<-NULL
+my_data3$`Identity `
+View(my_data3)
+str(my_data3)
+
+names(my_data3)[1]<-"Id"
+my_data3$Id<-NULL
+my_data3$`Identity `
+View(my_data3)
+mydata4$<-NA
+View(mydata4)
+write.csv(mydata4,"egr.csv")
+
+#########
+View(my_data3)
+str(my_data3)
+dim(h2)
+dim(my_data3)
+data786<-cbind(h2,my_data3)
+View(data786)
+data786 <- data786[, c(1,8,2,5,7,9,3,4,6,10)]
+View(data786)
+#####Convert into CSV file
+write.csv(data786,"Data.csv",row.names = FALSE)
+
+
+
+##############
+
+
+View(my_data34)
+
+View(A)
+class(scd123)
+View(scd123)
