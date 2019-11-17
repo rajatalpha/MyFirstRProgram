@@ -1,0 +1,47 @@
+import csv
+import requests
+from bs4 import BeautifulSoup
+import re 
+from urllib.request import urlopen
+import pandas as pd
+
+url = "https://www.timeanddate.com/weather/india/chennai/historic"  
+opening = urlopen(url)
+s_html_parser = BeautifulSoup(opening, "html.parser")
+Data123 = []
+table_required = s_html_parser.find('table', attrs={'id':'wt-his'})
+for tr in table_required.find('tbody').find_all('tr'):
+   dim = {}
+   all_td = tr.find_all('td')
+   dim['Temp'] = all_td[1].text
+   dim['Weather'] = all_td[2].text
+   dim['Wind'] = all_td[3].text
+   dim['Direction'] = all_td[4].span['title']
+   dim['Humidity'] = all_td[5].text
+   dim['Barometer'] = all_td[6].text
+   dim['Visibility'] = all_td[7].text
+   Data123.append(dim)
+data_df = pd.DataFrame(Data123)
+##Playing with the columns
+data_df['Barometer']= data_df['Barometer'].str.strip('mbar').astype('float')
+data_df['Barometer'] = data_df['Barometer'].apply(lambda x: float(round((x * 0.02953),2)))
+data_df['Barometer'] =  data_df['Barometer'].apply(lambda x: str(x) + '"Hg')
+data_df['Temp'] = data_df['Temp'].str.strip('°C').astype(int)
+data_df['Temp'] = data_df['Temp'].apply(lambda x: int(((x * 9/5) + 32)))
+data_df['Temp'] = data_df['Temp'].apply(lambda y: str(y) + '°F')
+data_df['Visibility']= data_df['Visibility'].str.strip('km/h').astype('float')
+data_df['Visibility'] = data_df['Visibility'].apply(lambda x: int((x * 0.621371)))
+data_df['Visibility'] = data_df['Visibility'].apply(lambda y: str(y) + 'mi')
+data_df['Wind'] = data_df['Wind'].replace('No wind','0 km/h')
+data_df['Wind']= data_df['Wind'].str.strip('km/h').astype(int)
+data_df['Wind'] = data_df['Wind'].apply(lambda x: int((x * 0.621371)))
+data_df['Wind'] = data_df['Wind'].apply(lambda y: str(y) + 'mph')
+data_df['Wind'] = data_df['Wind'].replace('0mph','No wind')
+data_df['Weather'] =data_df['Weather'].str.replace(" ","")
+data_df['Temp'] =data_df['Temp'].str.replace(" ","")
+data_df['Barometer'] =data_df['Barometer'].str.replace(" ","")
+data_df['Wind'] =data_df['Wind'].str.replace(" ","")
+data_df['Visibility'] =data_df['Visibility'].str.replace(" ","")
+data_df = data_df[['Temp', 'Weather', 'Wind', 'Direction','Humidity','Barometer','Visibility']]
+data_df.to_csv('data.csv',header= None, index = False,quoting = csv. QUOTE_NONE)
+#form the dataframe and put it in cs
